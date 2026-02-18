@@ -1,0 +1,214 @@
+WORLD CUP POISSON MONTE CARLO MODEL – FULL EXPLANATION
+
+This model is a probabilistic simulation of a World Cup tournament. 
+It uses historical team data to estimate attacking and defensive strength, then simulates group and knockout matches 
+using a Poisson goal model. The entire tournament is simulated many times to estimate championship probabilities.
+
+⸻
+
+	1.	OVERALL STRUCTURE
+
+The model has three main stages:
+	1.	Estimate team strengths from historical data using Poisson regression.
+	2.	Simulate one tournament using those strengths.
+	3.	Repeat the tournament many times (Monte Carlo simulation) to estimate probabilities of winning.
+
+⸻
+
+	2.	DATA LOADING AND FEATURE SELECTION
+
+The model loads all cleaned CSV files from a folder containing team statistics.
+
+It requires the following columns:
+	•	country
+	•	matches_played
+	•	goals_scored
+	•	goals_conceded
+
+It then selects all numeric columns except:
+	•	matches_played
+	•	goals_scored
+	•	goals_conceded
+	•	goal_difference
+	•	total_goal_count
+	•	goals_scored_per_match
+	•	goals_conceded_per_match
+
+These are removed to avoid target leakage or direct transformations of the target variable.
+
+Additional cleaning steps:
+	•	Drop columns with too many missing values.
+	•	Drop columns with no variation.
+	•	Remove highly collinear variables (correlation above 0.95).
+
+This results in a set of usable predictive features.
+
+⸻
+
+	3.	POISSON GLM FITTING
+
+Two Poisson generalized linear models (GLMs) are fitted:
+	1.	One predicting goals_scored.
+	2.	One predicting goals_conceded.
+
+The response variable is modeled as a Poisson count.
+An offset of log(matches_played) is included so the model predicts total goals properly scaled by games played.
+
+From these models, predicted total goals scored and conceded are generated for each country.
+
+⸻
+
+	4.	CONVERTING TO TEAM STRENGTHS
+
+For each country:
+	•	Predicted goals scored per match = total predicted goals scored divided by matches played.
+	•	Predicted goals conceded per match = total predicted goals conceded divided by matches played.
+
+The average goals per match across all teams is computed. This becomes BASE_GOALS.
+
+Then each team is assigned:
+
+attack strength = team goals per match divided by BASE_GOALS
+defense strength = team goals conceded per match divided by BASE_GOALS
+
+Attack > 1 means stronger than average.
+Defense > 1 means worse than average defense (because more conceded).
+
+⸻
+
+	5.	MATCH SIMULATION (POISSON MODEL)
+
+For a match between team A and team B:
+
+Expected goals for A:
+lambda_A = BASE_GOALS * attack_A * defense_B
+
+Expected goals for B:
+lambda_B = BASE_GOALS * attack_B * defense_A
+
+Goals are sampled from:
+Poisson(lambda_A)
+Poisson(lambda_B)
+
+This produces realistic low-scoring football distributions.
+
+⸻
+
+	6.	GROUP STAGE SIMULATION
+
+Each group contains four teams.
+
+Every team plays every other team once.
+For each match:
+	•	Goals are simulated.
+	•	Goals for and against are updated.
+	•	Points are awarded:
+	•	3 for win
+	•	1 for draw
+	•	0 for loss
+
+The table is sorted by:
+	1.	Points
+	2.	Goal difference
+	3.	Goals scored
+	4.	Alphabetical (as final tiebreaker)
+
+⸻
+	7.	QUALIFICATION TO KNOCKOUT
+
+There are 12 groups (A–L), each containing four teams.
+
+From each group:
+	•	The group winner advances.
+	•	The runner-up advances.
+	•	The third-place team is recorded.
+
+After all groups are complete:
+	•	The 12 group winners automatically qualify.
+	•	The 12 group runners-up automatically qualify.
+	•	The best 8 third-place teams across all groups qualify.
+
+Third-place teams are ranked by:
+	1.	Points
+	2.	Goal difference
+	3.	Goals scored
+	4.	Alphabetical order (final deterministic tiebreaker)
+
+This produces 32 total teams for the knockout stage.
+
+Round of 32 pairings follow the official FIFA bracket structure:
+	•	Each bracket slot specifies either a group winner, runner-up, 
+        or a third-place team from an allowed set of groups (for example: “3rd Group C/E/F/H/I”).
+	•	The model assigns third-place teams to eligible bracket slots while respecting these group constraints.
+
+This ensures the knockout bracket structure matches the official tournament format.
+
+⸻
+	8.	KNOCKOUT MATCH SIMULATION
+
+Knockout matches proceed in three stages:
+
+Step 1: 90 minutes are simulated using the Poisson goal model.
+
+Step 2: If tied, extra time is simulated using one-third of each team’s expected goals.
+
+Step 3: If still tied, penalties are taken.
+
+Penalty model:
+	•	Base probability is derived from relative expected goals.
+	•	The probability is shrunk toward 50% to preserve randomness.
+	•	The final probability is clamped between 35% and 65%.
+
+This prevents penalties from becoming deterministic while still reflecting relative team strength.
+
+⸻
+	9.	FULL TOURNAMENT SIMULATION
+
+A full tournament simulation consists of:
+	•	Group stage
+	•	Round of 32
+	•	Round of 16
+	•	Quarterfinals
+	•	Semifinals
+	•	Final
+
+One champion is returned per simulation.
+
+⸻
+
+	10.	MONTE CARLO SIMULATION
+
+The entire tournament is simulated N_SIMS times (default 20,000).
+
+For each simulation:
+	•	A champion is recorded.
+
+After all simulations:
+	•	Championship probability for each team = wins / N_SIMS.
+
+This produces estimated probabilities of winning the tournament.
+
+⸻
+
+	11.	WHAT THE MODEL CAPTURES
+
+	•	Team attacking quality
+	•	Team defensive quality
+	•	Stochastic goal scoring
+	•	Random match variance
+	•	Extra time dynamics
+	•	Skill-weighted but noisy penalties
+	•	Tournament structure effects
+
+⸻
+
+	12.	LIMITATIONS
+
+	•	No home advantage modeled.
+	•	Assumes independence between teams’ goal processes.
+	•	Does not account for tactical styles.
+	•	No dynamic form or injury effects.
+	•	Does not explicitly model correlation between team goals.
+	•	Uses historical averages rather than match-level opponent interactions.
+
+⸻
