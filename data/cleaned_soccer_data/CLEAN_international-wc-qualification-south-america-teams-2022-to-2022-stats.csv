@@ -1,0 +1,11 @@
+season,country,matches_played,wins,draws,losses,points_per_game,performance_rank,goals_scored,goals_conceded,goal_difference,total_goal_count,minutes_per_goal_scored,minutes_per_goal_conceded,clean_sheets,corners_total,average_possession,shots,shots_on_target,goals_scored_per_match,goals_conceded_per_match
+2022,Argentina,17,11,6,0,2.29,2,27,8,19,35,57,191,10,78,59,219,108,1.59,0.47
+2022,Uruguay,18,8,4,6,1.56,3,22,22,0,44,74,74,8,80,47,217,93,1.22,1.22
+2022,Ecuador,18,7,5,6,1.44,4,27,19,8,46,60,85,6,89,52,214,80,1.5,1.06
+2022,Brazil,17,14,3,0,2.65,1,40,5,35,45,38,310,13,68,59,247,124,2.35,0.29
+2022,Chile,18,5,4,9,1.06,7,19,26,-7,45,85,63,5,83,54,207,77,1.06,1.44
+2022,Colombia,18,5,8,5,1.28,6,20,19,1,39,81,85,8,96,53,227,90,1.11,1.06
+2022,Bolivia,18,4,3,11,0.83,9,23,42,-19,65,70,39,3,64,42,208,85,1.28,2.33
+2022,Peru,18,7,3,8,1.33,5,19,22,-3,41,85,74,5,63,45,177,85,1.06,1.22
+2022,Paraguay,18,3,7,8,0.89,8,12,26,-14,38,134,63,4,67,46,168,63,0.67,1.44
+2022,Venezuela,18,3,1,14,0.56,10,14,34,-20,48,115,48,1,78,43,205,82,0.78,1.89

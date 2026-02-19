@@ -1,0 +1,13 @@
+season,country,matches_played,wins,draws,losses,points_per_game,performance_rank,goals_scored,goals_conceded,goal_difference,total_goal_count,minutes_per_goal_scored,minutes_per_goal_conceded,clean_sheets,corners_total,average_possession,shots,shots_on_target,goals_scored_per_match,goals_conceded_per_match
+2019,Japan,3,0,2,1,0.67,9,3,7,-4,10,90,39,0,14,46,33,15,1,2.33
+2019,Qatar,3,0,1,2,0.33,10,2,5,-3,7,134,54,0,6,42,19,10,0.67,1.67
+2019,Argentina,6,3,1,2,1.67,2,7,6,1,13,77,90,2,27,52,64,33,1.17,1
+2019,Uruguay,4,2,2,0,2,4,7,2,5,9,51,180,3,25,54,46,23,1.75,0.5
+2019,Ecuador,3,0,1,2,0.33,11,2,7,-5,9,134,39,0,8,48,25,6,0.67,2.33
+2019,Brazil,6,4,2,0,2.33,1,13,1,12,14,41,529,5,38,62,70,33,2.17,0.17
+2019,Chile,6,2,1,3,1.17,6,7,7,0,14,77,77,2,33,53,60,30,1.17,1.17
+2019,Colombia,4,3,1,0,2.5,3,4,0,4,4,90,0,4,22,56,37,16,1,0
+2019,Bolivia,3,0,0,3,0,12,2,9,-7,11,134,30,0,4,43,16,7,0.67,3
+2019,Peru,6,2,2,2,1.33,5,7,9,-2,16,77,60,3,25,47,53,26,1.17,1.5
+2019,Paraguay,4,0,3,1,0.75,8,3,4,-1,7,120,90,1,10,41,32,18,0.75,1
+2019,Venezuela,4,1,2,1,1.25,7,3,3,0,6,120,120,2,19,44,33,17,0.75,0.75

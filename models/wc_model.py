@@ -36,7 +36,8 @@ N_SIMS = 20000  # increase if you want tighter estimates
 # 2) DATA: LOAD FROM FOLDER + USE ALL COLUMNS (NON-COLLINEAR)
 # =========================
 
-CLEAN_DIR = os.path.expanduser("~/Downloads/cleaned_soccer_data")
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CLEAN_DIR = os.path.join(REPO_ROOT, "data", "cleaned_soccer_data")
 
 REQUIRED_COLS = {"country", "matches_played", "goals_scored", "goals_conceded"}
 
@@ -100,8 +101,157 @@ def choose_features_all_numeric(df: pd.DataFrame) -> List[str]:
 
     return [c for c in feats if c not in to_drop]
 
+# =========================
+# FIFA + CONFED WEIGHTS
+# =========================
 
-def fit_poisson_glm(df: pd.DataFrame, y_col: str, feature_cols: List[str]) -> sm.GLM:
+# Wikipedia module that mirrors FIFA ranking points and is easy to parse.
+# It lists (team_name, rank, movement, points).
+FIFA_RANKINGS_RAW_URL = (
+    "https://en.wikipedia.org/wiki/Module:SportsRankings/data/FIFA_World_Rankings?action=raw"
+)
+
+# Your GROUPS use different names for a few teams vs FIFA/Wikipedia.
+FIFA_NAME_ALIASES = {
+    "South Korea": "Korea Republic",
+    "Iran": "IR Iran",
+    "Cape Verde": "Cabo Verde",
+    "Ivory Coast": "Côte d'Ivoire",
+    "New Zealand": "Aotearoa New Zealand",
+}
+
+# Confederation mapping for the 48 teams in your GROUPS
+TEAM_CONFED = {
+    # CONCACAF
+    "Mexico": "CONCACAF",
+    "Canada": "CONCACAF",
+    "USA": "CONCACAF",
+    "Haiti": "CONCACAF",
+    "Curaçao": "CONCACAF",
+    "Panama": "CONCACAF",
+
+    # UEFA
+    "Denmark": "UEFA",
+    "Switzerland": "UEFA",
+    "Italy": "UEFA",
+    "Scotland": "UEFA",
+    "Slovakia": "UEFA",
+    "Germany": "UEFA",
+    "Netherlands": "UEFA",
+    "Poland": "UEFA",
+    "Belgium": "UEFA",
+    "Spain": "UEFA",
+    "France": "UEFA",
+    "Norway": "UEFA",
+    "Austria": "UEFA",
+    "Portugal": "UEFA",
+    "England": "UEFA",
+    "Croatia": "UEFA",
+
+    # CONMEBOL
+    "Brazil": "CONMEBOL",
+    "Paraguay": "CONMEBOL",
+    "Ecuador": "CONMEBOL",
+    "Uruguay": "CONMEBOL",
+    "Argentina": "CONMEBOL",
+    "Colombia": "CONMEBOL",
+
+    # AFC
+    "South Korea": "AFC",
+    "Qatar": "AFC",
+    "Japan": "AFC",
+    "Iran": "AFC",
+    "Saudi Arabia": "AFC",
+    "Iraq": "AFC",
+    "Jordan": "AFC",
+    "Uzbekistan": "AFC",
+
+    # CAF
+    "South Africa": "CAF",
+    "Morocco": "CAF",
+    "Tunisia": "CAF",
+    "Egypt": "CAF",
+    "Senegal": "CAF",
+    "Algeria": "CAF",
+    "Congo DR": "CAF",
+    "Ghana": "CAF",
+    "Cape Verde": "CAF",
+
+    # OFC
+    "New Zealand": "OFC",
+
+    # (Australia is AFC in FIFA)
+    "Australia": "AFC",
+}
+
+def _fetch_text(url: str) -> str:
+    with urllib.request.urlopen(url) as r:
+        return r.read().decode("utf-8", errors="replace")
+
+def fetch_fifa_points_map() -> Dict[str, float]:
+    """
+    Returns dict: FIFA-style team name -> FIFA points (float).
+    Source contains lines like: {  "Spain", 1, 0, 1877.18 },
+    """
+    raw = _fetch_text(FIFA_RANKINGS_RAW_URL)
+    # Capture team + points (ignore rank/movement)
+    pattern = r'\{\s*"([^"]+)"\s*,\s*\d+\s*,\s*-?\d+\s*,\s*([0-9]+\.[0-9]+)\s*\}'
+    pairs = re.findall(pattern, raw)
+    return {name: float(pts) for name, pts in pairs}
+
+def team_fifa_points(team: str, points_map: Dict[str, float], default: float) -> float:
+    lookup = FIFA_NAME_ALIASES.get(team, team)
+    return float(points_map.get(lookup, default))
+
+def build_confed_strengths_from_points(points_by_team: Dict[str, float]) -> Dict[str, float]:
+    """
+    Computes a confederation multiplier from the average FIFA points of teams
+    in that confed (only among your 48 teams).
+    Normalizes so overall mean confed weight = 1.0.
+    """
+    confed_vals: Dict[str, List[float]] = {}
+    for t, pts in points_by_team.items():
+        conf = TEAM_CONFED.get(t)
+        if conf is None:
+            continue
+        confed_vals.setdefault(conf, []).append(pts)
+
+    confed_mean = {c: (sum(v) / len(v)) for c, v in confed_vals.items() if v}
+    overall = sum(confed_mean.values()) / len(confed_mean) if confed_mean else 1.0
+
+    # multiplier: confed avg / overall avg
+    return {c: (m / overall) for c, m in confed_mean.items()}
+
+def get_year_series(df: pd.DataFrame) -> pd.Series | None:
+    """
+    Try to find a usable 'year' column. Adjust these candidates if your data uses
+    a different name.
+    """
+    for col in ["year", "Year", "season_year", "tournament_year"]:
+        if col in df.columns:
+            y = pd.to_numeric(df[col], errors="coerce")
+            if y.notna().any():
+                return y
+    return None
+
+def recency_weights(years: pd.Series, half_life_years: float = 6.0) -> pd.Series:
+    """
+    Exponential decay so recent rows count more.
+    half_life_years=6 means data 6 years old counts ~50% as much.
+    """
+    y = years.copy()
+    max_y = float(y.max())
+    # decay constant: w = 0.5 ** (age / half_life)
+    age = (max_y - y).clip(lower=0)
+    return (0.5 ** (age / half_life_years)).fillna(1.0)
+
+
+def fit_poisson_glm(
+    df: pd.DataFrame,
+    y_col: str,
+    feature_cols: List[str],
+    weights: pd.Series | None = None,
+) -> sm.GLM:
     d = df.copy()
     d = d[d["matches_played"] > 0].copy()
 
@@ -117,15 +267,67 @@ def fit_poisson_glm(df: pd.DataFrame, y_col: str, feature_cols: List[str]) -> sm
 
     offset = np.log(d["matches_played"].astype(float))
 
-    model = sm.GLM(y, X, family=sm.families.Poisson(), offset=offset)
+    if weights is not None:
+        w = pd.to_numeric(weights.loc[d.index], errors="coerce").fillna(1.0)
+        w = w.clip(lower=0.0)
+    else:
+        w = None
+
+    model = sm.GLM(
+        y, X,
+        family=sm.families.Poisson(),
+        offset=offset,
+        freq_weights=w,
+    )
     return model.fit()
 
 
 def build_strengths_from_all_columns(df_all: pd.DataFrame) -> Tuple[pd.DataFrame, float, List[str]]:
     feature_cols = choose_features_all_numeric(df_all)
 
-    atk_fit = fit_poisson_glm(df_all, "goals_scored", feature_cols)
-    def_fit = fit_poisson_glm(df_all, "goals_conceded", feature_cols)
+    # --- FIFA points for the 48 teams in your GROUPS ---
+    all_group_teams = sorted({t for teams in GROUPS.values() for t in teams})
+
+    try:
+        points_map = fetch_fifa_points_map()
+        default_pts = float(np.median(list(points_map.values())))
+    except Exception:
+        points_map = {}
+        default_pts = 1500.0  # reasonable fallback
+
+    points_by_team = {t: team_fifa_points(t, points_map, default_pts) for t in all_group_teams}
+    confed_strength = build_confed_strengths_from_points(points_by_team)
+
+    # --- Build per-row weights for your training data ---
+    # team factor from FIFA points (mild effect so it doesn’t overpower your data)
+    # normalized around 1.0
+    pts_mean = float(np.mean(list(points_by_team.values()))) if points_by_team else default_pts
+    team_pts_scale = {t: (points_by_team[t] / pts_mean) for t in all_group_teams}
+
+    # If your df_all has a country column, map weights by row-country.
+    # If a country isn't in your 48-team list, weight=1.0.
+    def row_weight_for_country(c: str) -> float:
+        # confed multiplier
+        conf = TEAM_CONFED.get(c)
+        w_conf = confed_strength.get(conf, 1.0) if conf else 1.0
+        # fifa points multiplier
+        w_pts = team_pts_scale.get(c, 1.0)
+        return float(w_conf * w_pts)
+
+    base_w = df_all["country"].map(row_weight_for_country).fillna(1.0)
+
+    # Optional: year-based recency weights
+    y_series = get_year_series(df_all)
+    if y_series is not None:
+        w_time = recency_weights(y_series, half_life_years=6.0)
+    else:
+        w_time = pd.Series(1.0, index=df_all.index)
+
+    weights = (base_w * w_time).astype(float)
+
+    # --- Fit weighted GLMs ---
+    atk_fit = fit_poisson_glm(df_all, "goals_scored", feature_cols, weights=weights)
+    def_fit = fit_poisson_glm(df_all, "goals_conceded", feature_cols, weights=weights)
 
     d = df_all.copy()
     d = d[d["matches_played"] > 0].copy()

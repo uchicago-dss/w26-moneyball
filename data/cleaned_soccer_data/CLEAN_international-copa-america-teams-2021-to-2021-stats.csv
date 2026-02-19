@@ -1,0 +1,11 @@
+season,country,matches_played,wins,draws,losses,points_per_game,performance_rank,goals_scored,goals_conceded,goal_difference,total_goal_count,minutes_per_goal_scored,minutes_per_goal_conceded,clean_sheets,corners_total,average_possession,shots,shots_on_target,goals_scored_per_match,goals_conceded_per_match
+2021,Argentina,7,5,2,0,2.43,1,12,3,9,15,53,209,4,33,48,99,49,1.71,0.43
+2021,Uruguay,5,2,2,1,1.6,4,4,2,2,6,113,225,3,21,52,72,24,0.8,0.4
+2021,Ecuador,5,0,3,2,0.6,8,5,9,-4,14,90,50,0,44,55,64,24,1,1.8
+2021,Brazil,7,5,1,1,2.29,2,12,3,9,15,53,209,4,34,58,101,45,1.71,0.43
+2021,Chile,5,1,2,2,1,7,3,5,-2,8,150,90,1,18,57,51,27,0.6,1
+2021,Colombia,7,2,3,2,1.29,3,7,7,0,14,90,90,3,24,50,85,36,1,1
+2021,Bolivia,4,0,0,4,0,10,2,10,-8,12,180,36,0,9,35,24,14,0.5,2.5
+2021,Peru,7,2,2,3,1.14,5,10,14,-4,24,63,45,1,18,48,72,31,1.43,2
+2021,Paraguay,5,2,1,2,1.4,6,8,6,2,14,56,75,1,26,53,74,28,1.6,1.2
+2021,Venezuela,4,0,2,2,0.5,9,2,6,-4,8,180,60,1,17,37,28,10,0.5,1.5
